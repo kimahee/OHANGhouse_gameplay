@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#f5f1e7">
+  <meta name="description" content="입체 들판과 바다로 둘러싸인 화의 섬 노을마을을 걷고, 들판에서 기념물을 찾는 작은 생활 게임.">
+  <title>노을마을 산책 · 오행의 집</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./css/village.css">
+  <script defer src="./js/island-assets.js"></script>
+  <script defer src="./js/coast.js"></script>
+  <script defer src="./js/world.js"></script>
+  <script defer src="./js/scene.js"></script>
+  <script defer src="./js/landscape.js"></script>
+  <script defer src="./js/mailbox.js"></script>
+  <script defer src="./js/game.js"></script>
+</head>
+<body>
+<main aria-label="노을마을"><div class="stage" id="stage">
+            <canvas id="view" tabindex="0" aria-label="노을마을 산책. 방향키 또는 WASD로 걷고 E로 가까운 사물을 살펴봅니다. 땅을 누르면 그곳으로 걸어갑니다."></canvas>
+            <div class="position-chip"><i data-icon="pin"></i><span id="location">마을 어귀</span></div>
+            <button type="button" id="map-top" class="float-map" title="섬 지도 (M)" aria-label="섬 지도 열기"><i data-icon="map"></i></button>
+            <button type="button" class="hud-menu" id="menu-open" aria-label="산책 메뉴 열기" aria-haspopup="dialog">☰</button>
+<div id="loading" class="loading" role="status"><span id="boot-text">아이폰에서 플레이하려면 Safari에서 게임을 열어 주세요.</span><a id="boot-link" href="https://ohaeng-home-noeul-village.rompingrhino4.chatgpt.site" target="_blank" rel="noopener">게임 주소 열기</a></div>
+            <div class="travel-overlay" id="travel-overlay" role="status" hidden><span id="travel-message"></span></div>
+            <span id="notice" class="scene-notice" role="status" aria-live="polite" hidden></span>
+            <button id="act" class="act" type="button" hidden><kbd>E</kbd><span id="act-text">살펴보기</span></button>
+            <div id="stick" class="stick" role="group" aria-label="이동 조이스틱"><span class="stick-dots"></span><span id="stick-knob" class="stick-knob"></span></div>
+            <button id="run" class="run-control" type="button" aria-label="달리기 전환" aria-pressed="false"><i data-icon="run"></i></button>
+          </div></main>
+<dialog id="menu-dialog" aria-labelledby="menu-title"><div class="dialog-head"><h2 id="menu-title">산책 수첩</h2><button class="close" id="menu-close" aria-label="메뉴 닫기">×</button></div><div class="book-body">
+          <div class="collection-head"><h3>마을의 기념물</h3><span class="count" id="count" aria-label="모은 기념물 수">0 / 3</span></div>
+          <p class="book-hint" id="collection-hint">기념물을 골라 그곳까지 걸어가 보세요.</p>
+          <div id="souvenirs" class="souvenirs"></div>
+          <div class="map-heading"><h3>섬 지도</h3><span id="map-element">火 · 화의 섬</span></div>
+          <button type="button" id="mini-map" class="mini-map" aria-label="내 위치가 표시된 섬 지도 펼치기"><canvas id="mini" aria-hidden="true"></canvas><span class="map-north" aria-hidden="true">N <i>↑</i></span><span class="expand"><i data-icon="expand"></i></span></button>
+        </div><nav aria-label="게임 설정"><button type="button" id="sound" class="quiet-icon sound-control" aria-label="소리 켜기" title="소리 켜기" aria-pressed="false"><i data-icon="mute"></i><span>소리 끔</span></button><span class="nav-divider"></span><button type="button" id="help" class="quiet-icon"><i data-icon="controller"></i><span>조작 안내</span></button></nav><div class="menu-status"><span id="save-status" class="save-status" role="status"><i data-icon="check"></i><span>자동 저장</span></span></div></dialog>
+  <dialog id="panel" aria-labelledby="panel-title"><div class="dialog-head"><div><p class="eyebrow" id="panel-eyebrow"></p><h2 id="panel-title"></h2></div><button class="close" id="close" aria-label="닫기"><i data-icon="close"></i></button></div><div id="panel-body"></div></dialog>
+  <noscript>노을마을에서 산책하려면 브라우저의 자바스크립트를 켜 주세요.</noscript>
+</body></html>
