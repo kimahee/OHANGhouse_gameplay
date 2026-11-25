@@ -9,7 +9,7 @@
   let identityPromise;
   V.village=async(action,params={})=>{
     identityPromise??=navigator.locks?navigator.locks.request('ohaeng-owner',identity):Promise.resolve(identity());
-    const response=await fetch('./api/village',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,...params,token:await identityPromise}),signal:AbortSignal.timeout(7000)});
+    const response=await fetch('./api/village',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,...params,game:window.VillageHome.slot,token:await identityPromise}),signal:AbortSignal.timeout(7000)});
     if(!response.ok)throw Error('연결을 확인하고 다시 시도해 주세요.');
     return response.json();
   };

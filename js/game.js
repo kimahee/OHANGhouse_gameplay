@@ -19,15 +19,8 @@
     return Number.isSafeInteger(record?.harvestCount)&&record.harvestCount>0?record.harvestCount:0;
   }
   const state={harvestCount:readHarvestCount(saved),leafCount:Number.isSafeInteger(saved.leafCount)&&saved.leafCount>=0?saved.leafCount:0,found:new Set(V.keepsakes.filter(k=>Array.isArray(saved.found)&&saved.found.includes(k.id)).map(k=>k.id))};
-  const houseKey='ohaeng-owner-house-v1', framesKey='ohaeng-owner-frames-v1';
-  function migrateHouse(){
-    if(home.read(houseKey))return;
-    const legacy='ohaeng-village-house-v1';
-    let last;try{last=JSON.parse(home.read('ohaeng-last-game-v1'));}catch{}
-    const keys=[home.storageKey(legacy),...(last?.id?['ohaeng-save:'+last.id+':'+legacy]:[]),legacy,...Object.keys(localStorage).filter(k=>k.endsWith(':'+legacy))];
-    for(const k of keys){const value=home.read(k);if(value){home.write(houseKey,value);const frames=home.read(k.replace(legacy,'ohaeng-village-frames-v1'));if(frames)home.write(framesKey,frames);break;}}
-  }
-  migrateHouse();
+  const houseKey=home.storageKey('ohaeng-owner-house-v1');
+  const framesKey=home.storageKey('ohaeng-owner-frames-v1');
   let ownerId='',online=false;
   state.neighbors=[];
   async function refreshHomes(){
@@ -216,7 +209,7 @@
     soundOn=!soundOn;home.write(home.soundKey,soundOn?'on':'off');paintSound();tone(523);
   };
   paintSound();
-  $('game-home').onclick=()=>{save();window.location.assign(home.url());};
+  $('game-home').onclick=()=>{save();const target=home.url();target.searchParams.set('home','1');window.location.assign(target);};
   function stop(){route=[];onArrival=null;speed=0;player.moving=false;}
   const toolsToggle=$('notebook-tools-toggle'),toolsPanel=$('notebook-tools');
   function showNotebookTools(visible){
@@ -552,7 +545,7 @@
     filter.setAttribute('role','group');filter.setAttribute('aria-label','가구 오행');
     let elementFilter='all';
     function setMode(next){
-      mode=next;selection=null;picked=null;shelf.hidden=next==='wall';
+      mode=next;view=next==='wall'?2:1;updateView();selection=null;picked=null;shelf.hidden=next==='wall';
       floorTab.setAttribute('aria-pressed',String(mode==='floor'));wallTab.setAttribute('aria-pressed',String(mode==='wall'));update();
     }
     for(const item of frames){
@@ -621,11 +614,11 @@
       if(open){draft=structuredClone(rooms[roomKey()]);history=[];showFurniture();}
       else draft=null;
     }
-    const views=['정면','위에서 보기'];
+    const views=['산책 시점','바닥 꾸미기','벽 꾸미기'];
     const viewLabel=el('span'),cameraBar=el('div','camera-bar');
     function updateView(){viewLabel.textContent=views[view];}
     for(const step of [-1,1]){
-      const b=btn(step<0?'←':'→','secondary',()=>{view=(view+step+views.length)%views.length;updateView();});
+      const b=btn(step<0?'←':'→','secondary',()=>{const next=(view+step+views.length)%views.length;setMode(next===2?'wall':'floor');view=next;updateView();});
       b.setAttribute('aria-label',step<0?'이전 시점':'다음 시점');if(step>0)cameraBar.append(viewLabel);cameraBar.append(b);
     }
     updateView();
@@ -661,9 +654,9 @@
         const w=compact?1:item.w,h=compact?1:item.h;
         return {id:item.id,w,h,x:c.x+(w-1)*(bedroom?53:45)/2,y:c.y+(h-1)*35};
       }).sort((a,b)=>a.y-b.y);
-      if(draft&&view){V.drawPlan(ctx,view,house.color,bedroom,layout.wall.map(id=>available.get(id)),pieces,mode==='floor'?grids[key]:[],selection?.key);return;}
+      if(draft&&view){V.drawPlan(ctx,view,house.color,bedroom,layout.wall.map(id=>available.get(id)),pieces,mode==='floor'?grids[key]:[],selection?.key,house.island);return;}
       V.drawHouseInterior(ctx,house.color,guest,bedroom,layout.wall.map(id=>available.get(id)),!!draft,pieces,
-        draft&&mode==='floor'?grids[key]:[],selection?.key);
+        draft&&mode==='floor'?grids[key]:[],selection?.key,house.island);
     };
     const aspect=matchMedia("(min-aspect-ratio: 6/5)");aspect.addEventListener("change",describe);panel.addEventListener("close",()=>aspect.removeEventListener("change",describe),{once:true});
     interior(0);
@@ -891,5 +884,5 @@
   }
   new ResizeObserver(()=>{scene.measure();hud();if(large)scene.drawMap(large,state,player,true);}).observe($('stage'));
   scene.chat=V.startChat(C.id,player,()=>savedHouse?.name);
-  scene.measure();notebook();hud();save();home.markIsland(C.id);scene.drawScene(state,player,route,particles,performance.now(),media.matches);updateTravel();clearTimeout(watchdog);$('loading').hidden=true;if(!hasHouse()&&home.choosingHome)houseSetup();requestAnimationFrame(frame);
+  scene.measure();notebook();hud();save();scene.drawScene(state,player,route,particles,performance.now(),media.matches);updateTravel();clearTimeout(watchdog);$('loading').hidden=true;if(!hasHouse())houseSetup();requestAnimationFrame(frame);
 })().catch(()=>{document.getElementById('loading').hidden=false;document.getElementById('boot-text').textContent='게임을 시작하지 못했어요. Safari에서 게임 주소를 열어 주세요.';document.getElementById('boot-link').hidden=false;});

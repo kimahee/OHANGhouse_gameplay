@@ -41,6 +41,28 @@
     const names=designNames[element].split('|');
     [...catalog.values()].filter(item=>item.element===element&&item.listed).forEach((item,i)=>{item.name=names[i];});
   }
+  const collections={
+    wood:'목공 작업대|덩굴 진열장|나무 스툴|긴 나무 벤치|참나무 의자|이끼빛 소파|숲지기 침대|정원 협탁|꽃병 원탁|화분 선반|참나무 찬장|나뭇결 서랍장|한지 장스탠드|손잡이 등불|풀빛 러그|대나무 병풍|나무 전신거울|여닫이 궤짝|주방 도구걸이|장작 선반',
+    fire:'찻집 작업대|찻잎 보관장|호박빛 탁상등|무쇠 차 화로|적갈색 소파|찻집 의자|홍차 스툴|긴 찻집 벤치|노을 데이베드|촛불 협탁|꽃잎 찻상|찻잎 서랍장|찻잔 선반|찻집 찬장|꽃무늬 병풍|노을 장스탠드|구리 전신거울|벽돌빛 러그|차 도구 궤짝|다기 진열대',
+    earth:'도예 작업대|도공 물레|흙빛 좌식 소파|옹기 선반|낮은 작업 벤치|도공 의자|도예 스툴|모래빛 소파|보릿빛 침대|도자기 협탁|토기 원탁|흙빛 진열장|도구 보관장|황토 서랍장|종이 장스탠드|도기 등롱|볏짚 자리|천 병풍|토색 전신거울|흙그릇 건조대',
+    metal:'대장간 작업대|공구 선반|철제 옷장|부품 서랍장|대장간 소파|철제 침대|철제 협탁|주철 원탁|쇠다리 벤치|철제 의자|공방 스툴|관절 장스탠드|철제 랜턴|철망 바구니|공방 병풍|철테 전신거울|철제 궤짝|공구 카트|앞치마 걸이|회색 러그',
+    water:'개울 세면대|수건 선반|유리병 수경 정원|빨래 작업대|푸른 천 벤치|물빛 의자|세탁실 스툴|물빛 원탁|쪽빛 소파|물빛 침대|세탁실 협탁|푸른 서랍장|빨래 선반|푸른 찬장|천갓 장스탠드|유리 랜턴|물결 러그|천 병풍|은빛 전신거울|수건 바구니장'
+  };
+  const footprints={
+    wood:'21 21 11 21 11 21 22 11 21 21 21 21 11 11 22 31 11 21 21 21',
+    fire:'21 21 11 11 21 11 11 21 22 11 21 21 21 21 31 11 11 22 21 21',
+    earth:'21 11 21 21 21 11 11 21 22 11 21 21 21 21 11 11 22 31 11 21',
+    metal:'21 21 21 21 21 22 11 21 21 11 11 11 11 11 31 11 21 11 21 22',
+    water:'21 21 11 21 21 11 11 21 21 22 11 21 21 21 11 11 22 31 11 11'
+  };
+  for(const item of catalog.values())item.listed=false;
+  for(const [element,names] of Object.entries(collections)){
+    const sizes=footprints[element].split(' ');
+    names.split('|').forEach((name,tile)=>{
+      const id=element+':'+(53+tile),[w,h]=sizes[tile].split('').map(Number);
+      catalog.set(id,{id,element,name,w,h,tile,type:'collection',listed:true});
+    });
+  }
   function keysFor(anchor,w,h){
     const [row,col]=anchor.split('-').map(Number),result=[];
     for(let y=0;y<h;y++)for(let x=0;x<w;x++)result.push((row+y)+'-'+(col+x));

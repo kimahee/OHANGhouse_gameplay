@@ -20,14 +20,15 @@ export async function village(request, bucket) {
       cursor=page.truncated?page.cursor:undefined;
     }while(cursor);return reply({me,homes});
   }
+  const game=typeof b.game==='string'&&/^[a-f0-9]{32}$/.test(b.game)?b.game:null;
   if(b.action==='create'){
-    const old=await get(key);if(old)return reply(old);
+    const old=await get(key);if(old&&(!game||old.game===game))return reply(publicHouse(old));
     const h=b.house;if(!h||!islands.includes(h.island)||!islands.includes(h.color)||!clean(h.name,16)||![h.x,h.y].every(n=>Number.isFinite(n)&&n>=0&&n<=10000))return reply({},400);
     const house=publicHouse({...h,id:me,name:clean(h.name,16)});
-    const saved=await bucket.put(key,JSON.stringify(house),{onlyIf:{etagDoesNotMatch:'*'},customMetadata:{house:JSON.stringify(house)}});
-    return reply(saved?house:await get(key));
+    const saved=await bucket.put(key,JSON.stringify({...house,game}),{...(old?{}:{onlyIf:{etagDoesNotMatch:'*'}}),customMetadata:{house:JSON.stringify(house)}});
+    return reply(saved?house:publicHouse(await get(key)));
   }
-  if(b.action==='mine')return reply({house:await get(key),me});
+  if(b.action==='mine'){const house=await get(key);return reply({house:house&&(!game||house.game===game)?publicHouse(house):null,me});}
   if(b.action==='announce'){
     const message=clean(b.message,100);if(!message)return reply({},400);
     const name=(await get(key))?.name||'산책자', now=Date.now();
@@ -45,11 +46,13 @@ export async function village(request, bucket) {
   if(!validId.test(b.id))return reply({},400);
   if(b.action==='decorate'&&b.id!==me)return reply({},403);
   const h=await get('homes/'+b.id);if(!h)return reply({},404);
-  if(b.action==='visit')return reply({house:h,rooms:await get('layouts/'+b.id)});
+  const layoutKey='layouts/'+b.id+(h.game?'/'+h.game:'');
+  if(b.action==='visit')return reply({house:publicHouse(h),rooms:await get(layoutKey)});
   if(b.action==='decorate'){
+    if(h.game&&h.game!==game)return reply({},409);
     const rooms=b.rooms;
     if(!rooms || !['living','bedroom'].every(k=>rooms[k]&&Array.isArray(rooms[k].wall)&&rooms[k].wall.length<=3&&rooms[k].wall.every(s=>s==null||typeof s==='string')&&rooms[k].floor&&typeof rooms[k].floor==='object'&&Object.values(rooms[k].floor).every(s=>typeof s==='string')))return reply({},400);
-    await bucket.put('layouts/'+me,JSON.stringify(rooms));return reply({ok:true});
+    await bucket.put(layoutKey,JSON.stringify(rooms));return reply({ok:true});
   }
   const prefix='visitors/'+b.id+'/';
   if(b.action==='sign'){

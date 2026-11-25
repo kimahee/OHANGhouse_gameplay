@@ -14,19 +14,28 @@
     try { localStorage.setItem(key,value); } catch {}
   };
   const query = new URLSearchParams(location.search);
-  const playing = query.get('play')==='1'||islands.some(i=>i.id===query.get('island'));
   const validSlot=id=>typeof id==='string'&&/^[a-f0-9]{32}$/.test(id);
-  const requested=query.get('save');
-  const slot=validSlot(requested)?requested:'';
-  const storageKey=key=>slot?'ohaeng-save:'+slot+':'+key:key;
-  const resumePrefix='ohaeng-resume:';
-  const latestKey='ohaeng-last-game-v1';
-  const markIsland=island=>write(latestKey,JSON.stringify({id:slot,island}));
+  const slot=query.get('save');
+  const latestKey='ohaeng-last-game-v2';
+  const resumeWindow=10*60*1000;
+  function latestGame(){
+    try{
+      const record=JSON.parse(read(latestKey));
+      if(validSlot(record?.id)&&islands.some(i=>i.id===record.island)
+        &&Number.isFinite(record.time)&&Date.now()-record.time<resumeWindow)return record;
+    }catch{}
+    return null;
+  }
+  const current=latestGame();
+  const playing=query.get('play')==='1'&&current?.id===slot;
+  const storageKey=key=>'ohaeng-save:'+slot+':'+key;
+  const markIsland=island=>write(latestKey,JSON.stringify({id:slot,island,time:Date.now()}));
   const url = (id,saveSlot=slot) => {
     const target = new URL(location.href);
     target.searchParams.delete('island');
     target.searchParams.delete('play');
     target.searchParams.delete('house');
+    target.searchParams.delete('home');
     target.searchParams.delete('save');
     if(id){
       target.searchParams.set('play','1');
@@ -36,11 +45,32 @@
     return target;
   };
   const soundKey='ohaeng-village-sound';
-  window.VillageHome={playing,url,soundKey,read,write,storageKey,markIsland,choosingHome:query.get('house')==='1'};
+  window.VillageHome={playing,url,soundKey,read,write,storageKey,markIsland,slot};
   const $ = id => document.getElementById(id);
   $('game').hidden=!playing;
   $('home').hidden=playing;
-  if(playing)return;
+  if(playing){
+    const island=query.get('island')||'fire';
+    markIsland(island);
+    function refresh(){
+      if(latestGame()?.id!==slot){location.replace(url());return;}
+      if(!document.hidden)markIsland(island);
+    }
+    setInterval(()=>{if(!document.hidden)refresh();},5000);
+    document.addEventListener('visibilitychange',()=>{
+      if(latestGame()?.id!==slot){location.replace(url());return;}
+      markIsland(island);
+    });
+    addEventListener('pagehide',()=>{if(!document.hidden&&latestGame()?.id===slot)markIsland(island);});
+    addEventListener('pageshow',event=>{if(event.persisted)refresh();});
+    addEventListener('storage',event=>{if(event.key===latestKey&&latestGame()?.id!==slot)location.replace(url());});
+    return;
+  }
+  if(current&&query.get('home')!=='1'){
+    location.replace(url(current.island,current.id));
+    return;
+  }
+  if(query.has('play')||query.has('save')||query.has('island'))history.replaceState(null,'',url());
 
   function node(tag,content,cls){
     const element=document.createElement(tag);
@@ -53,7 +83,11 @@
     element.type='button';element.addEventListener('click',action);
     return element;
   }
-  function enter(island,saveSlot=''){const target=url(island.id,saveSlot);target.searchParams.set('house','1');location.assign(target);}
+  function enter(island){
+    const id=Array.from(crypto.getRandomValues(new Uint8Array(16)),n=>n.toString(16).padStart(2,'0')).join('');
+    write(latestKey,JSON.stringify({id,island:island.id,time:Date.now()}));
+    location.assign(url(island.id,id));
+  }
   const dialog=$('home-dialog'),body=$('home-dialog-body');
   function open(title){
     $('home-dialog-title').textContent=title;body.replaceChildren();
@@ -70,44 +104,13 @@
     open('섬 선택하기');
     const options=node('div',null,'home-picker');
     for(const island of islands){
-      const entry=button('',()=>enter(island,Array.from(crypto.getRandomValues(new Uint8Array(16)),n=>n.toString(16).padStart(2,'0')).join('')));
+      const entry=button('',()=>enter(island));
       const art=node('img');art.src=window.VillageIslandArt[island.id];art.alt='';
       entry.append(art,node('span',island.name));
       options.append(entry);
     }
     body.append(options);
   }
-  function latestGame(){
-    try{
-      const last=JSON.parse(read(latestKey));
-      const island=islands.find(i=>i.id===last?.island);
-      if(island&&(last.id===''||validSlot(last.id)))return {id:last.id,island};
-    }catch{}
-    const games=[];
-    try{
-      for(const key of Object.keys(localStorage)){
-        if(!key.startsWith(resumePrefix))continue;
-        const id=key.slice(resumePrefix.length);
-        if(id!=='legacy'&&!validSlot(id))continue;
-        let record;
-        try{record=JSON.parse(read(key));}catch{continue;}
-        const island=islands.find(i=>i.id===record?.island);
-        if(island)games.push({id:id==='legacy'?'':id,island,time:record.time||0});
-      }
-      if(!games.some(game=>!game.id)){
-        let house;
-        try{house=JSON.parse(read('ohaeng-village-house-v1'));}catch{}
-        const island=islands.find(i=>i.id===house?.island)||islands.find(i=>read('ohaeng-village-'+i.id+'-v1'));
-        if(island)games.push({id:'',island,time:0});
-      }
-    }catch{}
-    return games.sort((a,b)=>b.time-a.time)[0];
-  }
-  const resume=$('home-resume');
-  const refreshResume=()=>{resume.disabled=!latestGame();};
-  refreshResume();addEventListener('pageshow',refreshResume);addEventListener('storage',refreshResume);
-  const continueLast=()=>{const game=latestGame();if(game)location.assign(url(game.island.id,game.id));else refreshResume();};
-  resume.onclick=continueLast;
   $('home-play').onclick=chooseIsland;
 
   const codeFor=island=>'OH-'+island.id.toUpperCase();
