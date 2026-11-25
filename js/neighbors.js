@@ -6,6 +6,10 @@
     if(!token){token=Array.from(crypto.getRandomValues(new Uint8Array(32)),n=>n.toString(16).padStart(2,'0')).join('');localStorage.setItem(key,token);}
     return token;
   }
+  V.touchOnExit=()=>{
+    const token=localStorage.getItem('ohaeng-owner-token-v1');
+    if(token)navigator.sendBeacon('./api/village',new Blob([JSON.stringify({action:'touch',game:window.VillageHome.slot,token})],{type:'application/json'}));
+  };
   let identityPromise;
   V.village=async(action,params={})=>{
     identityPromise??=navigator.locks?navigator.locks.request('ohaeng-owner',identity):Promise.resolve(identity());

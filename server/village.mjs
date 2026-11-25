@@ -13,20 +13,34 @@ export async function village(request, bucket) {
   const get=async k=>{const obj=await bucket.get(k);return obj?obj.json():null;};
   const clean=(s,max)=>typeof s==='string'?s.trim().slice(0,max):'';
   const publicHouse=h=>({id:h.id,island:h.island,x:h.x,y:h.y,color:h.color,name:h.name});
-  if(b.action==='list'){
-    const homes=[];let cursor;
-    do{const page=await bucket.list({prefix:'homes/',include:['customMetadata'],cursor});
-      for(const o of page.objects){const h=JSON.parse(o.customMetadata.house);if(h.island===b.island)homes.push(h);}
-      cursor=page.truncated?page.cursor:undefined;
-    }while(cursor);return reply({me,homes});
-  }
   const game=typeof b.game==='string'&&/^[a-f0-9]{32}$/.test(b.game)?b.game:null;
+  const lifetime=10*60*1000;
+  async function touch(h){
+    if(!h||!game||(h.game&&game!==h.game))return;
+    const expires=Date.now()+lifetime;
+    await bucket.put('home-map/'+me,JSON.stringify({expires}),{customMetadata:{expires,house:publicHouse(h)}});
+  }
+  if(b.action==='touch'){await touch(await get(key));return reply({ok:true});}
+  if(b.action==='list'){
+    if(b.active)await touch(await get(key));
+    const homes=[];let cursor;
+    do{
+      const page=await bucket.list({prefix:'home-map/',include:['customMetadata'],cursor});
+      for(const row of page.objects){
+        const {house,expires}=row.customMetadata;
+        if(house?.island===b.island&&expires>Date.now())homes.push({...house,expires});
+      }
+      cursor=page.truncated?page.cursor:undefined;
+    }while(cursor);
+    return reply({me,homes,serverTime:Date.now()});
+  }
   if(b.action==='create'){
     const old=await get(key);if(old&&(!game||old.game===game))return reply(publicHouse(old));
     const h=b.house;if(!h||!islands.includes(h.island)||!islands.includes(h.color)||!clean(h.name,16)||![h.x,h.y].every(n=>Number.isFinite(n)&&n>=0&&n<=10000))return reply({},400);
     const house=publicHouse({...h,id:me,name:clean(h.name,16)});
     const saved=await bucket.put(key,JSON.stringify({...house,game}),{...(old?{}:{onlyIf:{etagDoesNotMatch:'*'}}),customMetadata:{house:JSON.stringify(house)}});
-    return reply(saved?house:publicHouse(await get(key)));
+    const stored=saved?{...house,game}:await get(key);
+    await touch(stored);return reply(publicHouse(stored));
   }
   if(b.action==='mine'){const house=await get(key);return reply({house:house&&(!game||house.game===game)?publicHouse(house):null,me});}
   if(b.action==='announce'){

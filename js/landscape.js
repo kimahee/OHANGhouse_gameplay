@@ -568,6 +568,15 @@
     await sheet.decode();
     sheets[element]=sheet;
   }));
+  // Columns correspond to bench, cabinet, plant, seat, sofa, table, shelf, bed, lamp, rug, screen, vase and mirror.
+  const legacyTiles={
+    wood:[3,11,1,4,5,8,9,6,12,14,15,8,16],
+    fire:[7,11,10,5,4,10,12,8,15,17,14,9,16],
+    earth:[4,13,3,5,7,10,11,8,14,16,17,9,18],
+    metal:[8,3,1,9,4,7,1,5,11,19,14,13,15],
+    water:[4,11,2,5,8,7,12,9,14,16,17,2,18]
+  };
+  const legacyFamilies=['seat','sofa','table','shelf','bed','lamp','rug','screen','vase','mirror'];
   const collections={};
   for(const element of Object.keys(window.VillageFurnitureSheets)){
     const img=new Image();img.src='./assets/'+element+'-collection.webp';collections[element]=img;
@@ -577,11 +586,12 @@
     const [element,kind]=id.split(':');
     const item=V.catalog.get(id);
     if(!item)return;
-    if(item.tile!==undefined){
+    const tileIndex=item.tile??legacyTiles[element]?.[item.type==='classic'?Number(kind):3+legacyFamilies.indexOf(item.type)];
+    if(tileIndex!==undefined){
       const img=collections[element];
       if(img.complete&&img.naturalWidth){
         const size=img.width/4;
-        c.drawImage(img,item.tile%4*size,Math.floor(item.tile/4)*size,size,size,x-24,y-45,48,48);
+        c.drawImage(img,tileIndex%4*size,Math.floor(tileIndex/4)*size,size,size,x-24,y-45,48,48);
       }
       return;
     }
@@ -924,7 +934,11 @@
       }
       for(const house of [...(state.neighbors||[]),state.house].filter(Boolean)){
         const [x,y]=xy(house);
-        oval(c,x,y,10,10,'#fff0c8',ink);
+        oval(c,x,y,10,10,house===state.house?'#fff0c8':'#c2ded3',ink);
+        if(large&&house!==state.house){
+          c.save();c.font='600 11px system-ui';c.textAlign='center';c.lineWidth=3;
+          c.strokeStyle='#fff5e3';c.strokeText(house.name,x,y-13);c.fillStyle='#3e4840';c.fillText(house.name,x,y-13);c.restore();
+        }
         c.save();c.translate(x,y);
         shape(c,'M-5 -1L0 -5L5 -1V5H-5Z',houseStyles[house.color].roof,ink,1);
         c.restore();

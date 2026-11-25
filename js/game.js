@@ -23,8 +23,25 @@
   const framesKey=home.storageKey('ohaeng-owner-frames-v1');
   let ownerId='',online=false;
   state.neighbors=[];
+  let syncingHomes=false,refreshOpenMap=null,expiryTimer;
+  function applyNeighbors(homes){
+    state.neighbors=homes.filter(h=>h.until>performance.now());
+    clearTimeout(expiryTimer);
+    if(state.neighbors.length){
+      const next=Math.min(...state.neighbors.map(h=>h.until));
+      expiryTimer=setTimeout(()=>applyNeighbors(state.neighbors),Math.max(1,next-performance.now()));
+    }
+    refreshOpenMap?.();
+  }
   async function refreshHomes(){
-    try{const data=await V.village('list',{island:C.id});ownerId=data.me;state.neighbors=data.homes.filter(h=>h.id!==ownerId);}catch{}
+    if(syncingHomes||document.hidden)return;
+    syncingHomes=true;
+    try{
+      const data=await V.village('list',{island:C.id,active:!!savedHouse});
+      ownerId=data.me;
+      const now=performance.now();
+      applyNeighbors(data.homes.filter(h=>h.id!==ownerId).map(h=>({...h,until:now+h.expires-data.serverTime})));
+    }catch{}finally{syncingHomes=false;}
   }
   let savedHouse;
   try{savedHouse=JSON.parse(home.read(houseKey));}catch{}
@@ -37,8 +54,17 @@
       else if(hasHouse()){savedHouse=await V.village('create',{house:savedHouse});
         const legacy=home.read(framesKey);if(legacy){try{await V.village('decorate',{id:ownerId,rooms:JSON.parse(legacy)});}catch{}}}
       if(savedHouse)home.write(houseKey,JSON.stringify(savedHouse));
-      refreshHomes();setInterval(()=>{if(!document.hidden)refreshHomes();},10000);
+
     }catch{}
+  }
+  if(location.protocol.startsWith('http')){
+    setInterval(refreshHomes,10000);
+    document.addEventListener('visibilitychange',()=>{
+      if(document.hidden){if(savedHouse)V.touchOnExit();}
+      else refreshHomes();
+    });
+    addEventListener('pagehide',()=>{if(savedHouse)V.touchOnExit();});
+    refreshHomes();
   }
   if(hasHouse()&&savedHouse.island===C.id)state.house=savedHouse;
   const terrain=new V.Terrain(),player={x:C.cx,y:C.cy,dir:'down',moving:false,running:false,sitting:false,phase:0};
@@ -329,8 +355,8 @@
   function atFrontDoor(){
     return [state.house,...state.neighbors].filter(Boolean).filter(h=>V.distance(player,doorstep(h))<=34).sort((a,b)=>V.distance(player,doorstep(a))-V.distance(player,doorstep(b)))[0];
   }
-  function confirmHouseEntry(){
-    const h=atFrontDoor();if(!h)return;
+  function confirmHouseEntry(target){
+    const h=target?.id?target:atFrontDoor();if(!h)return;
     modal('집에 들어가시겠습니까?','');
     panel.classList.add('house-heading');
     const actions=el('div','house-entry-actions');
@@ -728,6 +754,13 @@
     observer.observe(canvas);
     panel.addEventListener('close',()=>observer.disconnect(),{once:true});
   }
+  function walkToNeighbor(h){
+    go(doorstep(h),()=>{
+      const live=state.neighbors.find(n=>n.id===h.id&&V.distance(n,h)<1);
+      if(!live){notice('지도에서 집 위치가 변경됐어요.');return;}
+      confirmHouseEntry(live);
+    });
+  }
   function map(){
     modal(islandName+' 지도','ISLAND MAP',true);
     const mapView=el('div','harvest-map-view');
@@ -744,11 +777,22 @@
     const mapHint=el('span');mapHint.setAttribute('role','status');legend.append(mapHint);body.append(legend);
     const places=el('div','places');
     if(state.house){const b=btn(state.house.name+'의 집','',()=>go(doorstep(state.house)));b.append(ico('arrow'));places.append(b);}
-    for(const h of state.neighbors){places.append(btn(h.name+'의 집 방문','secondary',()=>visitHouse(h)));}
+    const neighboring=el('div','neighbor-destinations');neighboring.style.display='contents';places.append(neighboring);
+    const mapCanvas=large;
+    let namesKey=null;
+    refreshOpenMap=()=>{
+      if(large!==mapCanvas||!panel.open){refreshOpenMap=null;return;}
+      const signature=JSON.stringify(state.neighbors.map(h=>[h.id,h.name,h.x,h.y]));
+      if(signature!==namesKey){
+        namesKey=signature;neighboring.replaceChildren();
+        for(const h of state.neighbors)neighboring.append(btn(h.name+'의 집으로 걷기','secondary',()=>walkToNeighbor(h)));
+      }
+      scene.drawMap(mapCanvas,state,player,true);
+    };
     if(!hasHouse())places.append(btn('집터 고르기','',houseSetup));
     for(const p of V.getPlaces(state)){const b=btn(p.name,'',()=>toPlace(p.id));b.append(ico('arrow'));places.append(b);}
     for(const island of destinations)places.append(travelButton(btn('','travel-card',null),island));
-    body.append(btn('오행 전체 지도','secondary',atlasMap),places);scene.drawMap(large,state,player,true);
+    body.append(btn('오행 전체 지도','secondary',atlasMap),places);refreshOpenMap();refreshHomes();
     large.onclick=e=>{
       const b=large.getBoundingClientRect();
       const x=e.clientX-b.left-large.clientLeft,y=e.clientY-b.top-large.clientTop;
@@ -759,7 +803,7 @@
           x>=left&&x<=left+width&&y>=top&&y<=top+height);
         if(marker){confirmTravel(marker.island);return;}
       }
-      const other=state.neighbors.find(h=>V.distance(h,to)<12/m.s);if(other){visitHouse(other);return;}
+      const other=state.neighbors.find(h=>V.distance(h,to)<12/m.s);if(other){walkToNeighbor(other);return;}
       if(state.house&&V.distance(state.house,to)<12/m.s){go(doorstep(state.house));return;}
       if(harvestSite&&V.distance(harvestSite,to)<12/m.s)return;
       const p=V.getPlaces(state).find(p=>V.distance(p,to)<10/m.s);
